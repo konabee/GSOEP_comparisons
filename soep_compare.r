@@ -1,4 +1,4 @@
-## This code is writteb by Chia Liu April 2021 ## 
+## This code is written by Chia Liu April 2021 ## 
 
 x<-c('tidyverse','haven','survival','survminer')
 lapply(x,require,character.only=T)
@@ -119,7 +119,7 @@ ggsurvplot(fit3,size=0.5, surv.median.line="hv",censor=F, xlim=c(0,120),
 
 ## Note: Migrants and East German observations are excluded from the SOEP sample.
 
-soep<-read_dta("C:/Users/ccl26/OneDrive - University of St Andrews/MigrantLife/Stata/ppathl.dta") %>% 
+soep<-read_dta("ppathl.dta") %>% 
   filter(gebjahr %in% c(1944:1982) & sampreg==1 & migback==1 & sex==2) %>%
   select(pid,gebjahr,syear) %>% group_by(pid) %>% slice(which.max(syear)) %>% ungroup() %>% 
   mutate(ageg=case_when(
@@ -130,7 +130,7 @@ soep<-read_dta("C:/Users/ccl26/OneDrive - University of St Andrews/MigrantLife/S
   ))
 
 ## 7099 out of 17043 have partnership history on record ## 
-bioc<-read_dta("C:/Users/ccl26/OneDrive - University of St Andrews/MigrantLife/Stata/biocouply.dta") %>% 
+bioc<-read_dta("biocouply.dta") %>% 
   filter(pid %in% c(soep$pid)) %>% select(pid,begin,spelltyp) %>%
   sapply(as.numeric) %>% as.data.frame() %>% 
   mutate(spelltyp=case_when(
@@ -163,7 +163,7 @@ ggsurvplot(fit1,censor=F,xlim=c(15,40),break.time.by=5,conf.int=F,
            legend.title="Birth cohort",title='First union (yearly data)')+
   labs(captions='SOEP, calculation by CL')
   
-## cohab to marriage
+## transition from cohab to marriage
 bio2<-bioc %>% filter(spelltyp %in% c('cohab','married')) %>% group_by(pid,spelltyp) %>% slice(which.min(begin)) %>% 
   pivot_wider(names_from=spelltyp,values_from=begin) %>% filter(cohab<=married | is.na(married)) 
 
@@ -174,9 +174,9 @@ combo<-left_join(bio3,all,by='pid') %>%
          dur=ifelse(dur<0,0,dur),
          event=ifelse(is.na(married),0,1)) %>% filter(cohab>=16)
 
+## convert yearly duration to monthly to smooth curves ## 
 combo$mvec <- sample(1:12, nrow(combo), replace = TRUE) 
 combo$dur<-ifelse(combo$dur==0,combo$mvec,(combo$dur*12)+combo$mvec)
-
 
 combo$surv_obj1<-Surv(time=combo$dur,event=combo$event)
 fit1<-survfit(surv_obj1~ageg, data=combo) 
@@ -198,9 +198,8 @@ ggsurvplot(fit1,censor=F,xlim=c(0,240),break.time.by=12,xscale=12,conf.int=F,
            ggtheme = theme_bw(base_size = 10),
            legend.title="Birth cohort",title='Cohab to marriage, exclude joint transitions (yearly data)')
            
- ## Reproduce cumulative incidence of cohab/marriage 
- 
- bio4<-bioc %>% filter(begin>=16) %>% group_by(pid,spelltyp) %>% slice(which.min(begin)) %>% ungroup() %>% arrange(pid,begin)
+## Reproduce cumulative incidence of cohab/marriage 
+bio4<-bioc %>% filter(begin>=16) %>% group_by(pid,spelltyp) %>% slice(which.min(begin)) %>% ungroup() %>% arrange(pid,begin)
 
 bwide<-pivot_wider(bio4,names_from=spelltyp,values_from=begin) %>% mutate_all(~replace(., is.na(.), 9999))
 
@@ -225,7 +224,6 @@ all4$durcm<-((all4$dur*12)+all4$mvec)/12
 fitc<-cmprsk::cuminc(all4$durcm,all4$status_f,all4$ageg,rho=0, cencode=0,na.action=na.omit)
 
 trace(survminer:::ggcompetingrisks.cuminc, edit = T) ## add ,nrow = 1, to facet_wrap(~group)  ## 
-
 
 ggcompetingrisks(fitc,conf.int=T, xlim = c(15,55),ylim=c(0,1),palette=c('dodgerblue4','firebrick4'))+
    labs(title='Competing risk of entrance into cohabitation or marriage', x='Age',caption='Source: SOEP, calculation by CL') +
